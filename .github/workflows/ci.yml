@@ -95,3 +95,29 @@ jobs:
           severity: CRITICAL
           ignore-unfixed: true
           exit-code: "1"
+
+  frontend:
+    name: Frontend Build & Image Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build Angular & Nginx container image
+        uses: docker/build-push-action@v6
+        with:
+          context: frontend/ticketflow-ui
+          load: true
+          push: false
+          tags: ticketflow/frontend:ci
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
+
+      - name: Scan frontend image with Trivy
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ticketflow/frontend:ci
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"

@@ -22,9 +22,11 @@
 ticketflow/
 ├── docker/postgres/init/         # Initializes auth_db, event_db, booking_db, payment_db
 ├── docs/architecture.md          # Detailed system design & Saga choreography docs
+├── helm/ticketflow/              # Parameterized Helm v2 chart (values.yaml, values-prod.yaml, templates/)
 ├── k8s/                          # Kubernetes manifests (Namespace, ConfigMap, Secrets, Services, HPA, Ingress)
 ├── load-tests/flash-sale.js      # k6 flash-sale concurrency & Redis SETNX race test script
-├── monitoring/prometheus.yml     # Prometheus scrape configuration for all 6 Spring Boot microservices
+├── monitoring/                   # Prometheus alert rules, scrape config & Grafana telemetry dashboard
+├── terraform/                    # AWS EKS, Multi-AZ RDS Postgres 16, ElastiCache Redis 7 & ECR IaC
 ├── frontend/ticketflow-ui/       # Angular SPA + Nginx config + multi-stage Dockerfile
 │   ├── nginx.conf                # Non-root Nginx (:8080), SPA fallback, /api/ proxy, gzip
 │   ├── docker-entrypoint.sh      # Injects runtime API_URL into /usr/share/nginx/html/env.js
@@ -87,6 +89,16 @@ kubectl get hpa -n ticketflow -w
 ```bash
 # Run the flash-sale catalog spike + 15-VU concurrent seat hold race on seat A1
 k6 run -e BASE_URL=http://localhost:8080 load-tests/flash-sale.js
+```
+
+---
+
+## 🧪 End-to-End Automated Smoke Test
+
+```bash
+# Exercises Auth -> Venue/Event Publish -> Redis 10m Seat Hold -> 409 Conflict Check -> Checkout -> RabbitMQ Saga
+chmod +x scripts/smoke-test.sh
+./scripts/smoke-test.sh
 ```
 
 ---

@@ -64,23 +64,18 @@ export function raceForSameSeat() {
   const email = `racer-${__VU}-${Date.now()}@ticketflow.io`;
   const password = 'Password123!';
 
-  const regRes = http.post(
+  http.post(
     `${BASE_URL}/api/auth/register`,
-    JSON.stringify({ email, password, role: 'USER' }),
+    JSON.stringify({ email, password, fullName: `Racer VU ${__VU}`, role: 'USER' }),
     { headers: { 'Content-Type': 'application/json' } }
   );
 
-  let token = '';
-  if (regRes.status === 201 || regRes.status === 200) {
-    token = regRes.json('accessToken');
-  } else {
-    const loginRes = http.post(
-      `${BASE_URL}/api/auth/login`,
-      JSON.stringify({ email, password }),
-      { headers: { 'Content-Type': 'application/json' } }
-    );
-    token = loginRes.json('accessToken');
-  }
+  const loginRes = http.post(
+    `${BASE_URL}/api/auth/login`,
+    JSON.stringify({ email, password }),
+    { headers: { 'Content-Type': 'application/json' } }
+  );
+  const token = loginRes.json('accessToken');
 
   const holdPayload = JSON.stringify({
     eventId: CONTESTED_EVENT_ID,

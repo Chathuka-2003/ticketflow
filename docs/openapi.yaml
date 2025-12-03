@@ -1,0 +1,103 @@
+openapi: 3.0.3
+info:
+  title: TicketFlow Cloud-Native Event Ticketing API
+  version: 1.0.0
+  description: |
+    Unified REST API exposed via Spring Cloud Gateway (`:8080`) backing the TicketFlow Angular SPA.
+    Includes RS256 JWKS authentication, venue & event management, 10-minute Redis atomic seat holds (`SETNX`),
+    idempotent checkout, and asynchronous RabbitMQ Saga choreography.
+servers:
+  - url: http://localhost:8080
+    description: Local API Gateway
+  - url: http://localhost:4200
+    description: Local Nginx Reverse Proxy
+
+paths:
+  /api/auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a new user or organizer account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, fullName]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8 }
+                fullName: { type: string }
+                role: { type: string, enum: [USER, ORGANIZER, ADMIN] }
+      responses:
+        "201":
+          description: User created
+
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      summary: Authenticate and receive RS256 access token + HttpOnly refresh cookie
+      responses:
+        "200":
+          description: Access token issued
+
+  /api/events:
+    get:
+      tags: [Events]
+      summary: Search published events with optional category, city, and keyword filters
+      responses:
+        "200":
+          description: Paginated event list
+    post:
+      tags: [Events]
+      summary: Create a new draft event (ORGANIZER or ADMIN)
+      responses:
+        "201":
+          description: Draft event created
+
+  /api/bookings/events/{eventId}/seats:
+    get:
+      tags: [Bookings]
+      summary: Get live Redis-held and PostgreSQL-sold seat labels for an event
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Live seat availability state
+
+  /api/bookings/hold:
+    post:
+      tags: [Bookings]
+      summary: Acquire atomic 10-minute Redis TTL lock (SETNX) on selected seats
+      responses:
+        "201":
+          description: Seat hold lock acquired (TTL = 600s)
+        "409":
+          description: Seat already held by another buyer or already sold
+
+  /api/bookings/checkout:
+    post:
+      tags: [Bookings]
+      summary: Execute idempotent checkout and trigger RabbitMQ Saga choreography
+      responses:
+        "201":
+          description: Booking confirmed or compensated
+
+  /api/payments/mine:
+    get:
+      tags: [Payments]
+      summary: List current user's payment transactions from payment_db
+      responses:
+        "200":
+          description: List of payments
+
+  /api/notifications/mine:
+    get:
+      tags: [Notifications]
+      summary: List current user's dispatched QR ticket notifications
+      responses:
+        "200":
+          description: List of notifications

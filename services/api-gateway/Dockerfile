@@ -2,16 +2,13 @@
 FROM eclipse-temurin:21-jdk AS build
 WORKDIR /workspace
 
-# Retry flaky downloads instead of failing on the first dropped connection
 ENV MAVEN_OPTS="-Dhttps.protocols=TLSv1.2 -Dmaven.wagon.http.retryHandler.count=5 -Daether.connector.http.retryHandler.count=5 -Dmaven.wagon.http.pool=false"
 
-COPY mvnw pom.xml ./
-COPY .mvn .mvn
-RUN sed -i 's/\r$//' mvnw && chmod +x mvnw
-RUN --mount=type=cache,target=/root/.m2 ./mvnw -B dependency:go-offline
-
-COPY src src
-RUN --mount=type=cache,target=/root/.m2 ./mvnw -B -q package -DskipTests
+COPY . .
+RUN sed -i 's/\r$//' mvnw && chmod +x mvnw \
+    && if ! ls target/*.jar >/dev/null 2>&1; then \
+         ./mvnw -B -q package -DskipTests; \
+       fi
 
 # ---------- runtime stage ----------
 FROM eclipse-temurin:21-jre

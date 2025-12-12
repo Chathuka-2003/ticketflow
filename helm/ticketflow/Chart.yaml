@@ -1,0 +1,14 @@
+apiVersion: v2
+name: ticketflow
+description: Cloud-Native Event Ticket Booking Platform Helm Chart (Spring Boot 3 + Angular + Redis + RabbitMQ)
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - ticketing
+  - microservices
+  - spring-boot
+  - angular
+  - redis
+  - rabbitmq
+  - saga

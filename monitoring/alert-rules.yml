@@ -1,0 +1,29 @@
+groups:
+  - name: ticketflow-slo-alerts
+    rules:
+      - alert: MicroserviceDown
+        expr: up{job="ticketflow-microservices"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "TicketFlow microservice {{ $labels.instance }} is down"
+          description: "Instance {{ $labels.instance }} has been unreachable for more than 1 minute."
+
+      - alert: HighCheckoutLatencyP95
+        expr: histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{uri="/api/bookings/checkout"}[5m])) by (le)) > 0.8
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High p95 checkout latency (>800ms)"
+          description: "Booking checkout p95 latency exceeded 800ms over the last 2 minutes."
+
+      - alert: HighHttp5xxErrorRate
+        expr: sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m])) by (application) / sum(rate(http_server_requests_seconds_count[5m])) by (application) > 0.05
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High HTTP 5xx error rate in {{ $labels.application }}"
+          description: "More than 5% of HTTP requests are failing with 5xx responses."

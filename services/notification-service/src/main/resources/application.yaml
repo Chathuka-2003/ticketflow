@@ -9,6 +9,15 @@ spring:
     port: ${RABBITMQ_PORT:5672}
     username: ${RABBITMQ_USER:ticketflow}
     password: ${RABBITMQ_PASSWORD:ticketflow_secret}
+  mail:
+    host: ${SMTP_HOST:localhost}
+    port: ${SMTP_PORT:1025}
+    properties:
+      mail:
+        smtp:
+          auth: false
+          starttls:
+            enable: false
   security:
     oauth2:
       resourceserver:

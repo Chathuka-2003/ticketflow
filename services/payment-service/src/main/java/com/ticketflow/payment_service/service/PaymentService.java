@@ -3,6 +3,7 @@ package com.ticketflow.payment_service.service;
 import com.ticketflow.payment_service.dto.PaymentChargeRequest;
 import com.ticketflow.payment_service.dto.PaymentResponse;
 import com.ticketflow.payment_service.dto.SagaBookingEvent;
+import com.ticketflow.payment_service.dto.StripeWebhookPayload;
 import com.ticketflow.payment_service.entity.Payment;
 import com.ticketflow.payment_service.entity.PaymentStatus;
 import com.ticketflow.payment_service.repository.PaymentRepository;
@@ -81,6 +82,33 @@ public class PaymentService {
         Payment saved = paymentRepository.save(payment);
         log.info("Recorded Saga payment {} for booking {}", saved.getTransactionRef(), event.bookingReference());
         return toResponse(saved);
+    }
+
+    @Transactional
+    public PaymentResponse handleStripeWebhook(StripeWebhookPayload payload) {
+        Optional<Payment> existing = paymentRepository.findByIdempotencyKey(payload.idempotencyKey());
+        if (existing.isPresent()) {
+            return toResponse(existing.get());
+        }
+
+        PaymentStatus status = "payment_intent.payment_failed".equalsIgnoreCase(payload.type())
+                ? PaymentStatus.FAILED
+                : PaymentStatus.COMPLETED;
+        String txRef = "STRIPE-" + payload.eventId();
+
+        Payment payment = Payment.builder()
+                .bookingId(payload.bookingId())
+                .bookingReference(payload.bookingReference())
+                .userId(payload.userId())
+                .userEmail(payload.userEmail())
+                .amount(payload.amount())
+                .paymentMethod("STRIPE_WEBHOOK")
+                .status(status)
+                .idempotencyKey(payload.idempotencyKey())
+                .transactionRef(txRef)
+                .build();
+
+        return toResponse(paymentRepository.save(payment));
     }
 
     @Transactional(readOnly = true)

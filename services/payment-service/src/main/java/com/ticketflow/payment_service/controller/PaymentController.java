@@ -2,6 +2,7 @@ package com.ticketflow.payment_service.controller;
 
 import com.ticketflow.payment_service.dto.PaymentChargeRequest;
 import com.ticketflow.payment_service.dto.PaymentResponse;
+import com.ticketflow.payment_service.dto.StripeWebhookPayload;
 import com.ticketflow.payment_service.security.CurrentUser;
 import com.ticketflow.payment_service.service.PaymentService;
 import jakarta.validation.Valid;
@@ -41,5 +42,10 @@ public class PaymentController {
             @PathVariable UUID bookingId,
             @AuthenticationPrincipal Jwt jwt) {
         return paymentService.getByBookingId(bookingId, CurrentUser.from(jwt));
+    }
+
+    @PostMapping("/webhook/stripe")
+    public PaymentResponse handleStripeWebhook(@Valid @RequestBody StripeWebhookPayload payload) {
+        return paymentService.handleStripeWebhook(payload);
     }
 }

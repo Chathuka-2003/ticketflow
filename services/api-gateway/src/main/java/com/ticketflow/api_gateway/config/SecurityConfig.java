@@ -56,7 +56,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/login",
-                                "/api/auth/refresh", "/api/auth/logout").permitAll()
+                                "/api/auth/refresh", "/api/auth/logout",
+                                "/api/payments/webhook/stripe").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/events/mine").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/events", "/api/events/*", "/api/venues",
                                 "/api/bookings/events/*/seats").permitAll()

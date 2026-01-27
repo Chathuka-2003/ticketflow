@@ -42,6 +42,13 @@ services:
       timeout: 10s
       retries: 5
 
+  mailpit:
+    image: axllent/mailpit:v1.21
+    container_name: ticketflow-mailpit
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
   auth-service:
     build: ./services/auth-service
     image: ticketflow/auth-service:local
@@ -151,6 +158,8 @@ services:
       RABBITMQ_PORT: 5672
       RABBITMQ_USER: ${RABBITMQ_USER:-ticketflow}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-ticketflow_secret}
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
       JWKS_URI: http://auth-service:8081/.well-known/jwks.json
     ports:
       - "8085:8085"

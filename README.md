@@ -22,6 +22,9 @@
 ticketflow/
 ├── docker/postgres/init/         # Initializes auth_db, event_db, booking_db, payment_db
 ├── docs/architecture.md          # Detailed system design & Saga choreography docs
+├── k8s/                          # Kubernetes manifests (Namespace, ConfigMap, Secrets, Services, HPA, Ingress)
+├── load-tests/flash-sale.js      # k6 flash-sale concurrency & Redis SETNX race test script
+├── monitoring/prometheus.yml     # Prometheus scrape configuration for all 6 Spring Boot microservices
 ├── frontend/ticketflow-ui/       # Angular SPA + Nginx config + multi-stage Dockerfile
 │   ├── nginx.conf                # Non-root Nginx (:8080), SPA fallback, /api/ proxy, gzip
 │   ├── docker-entrypoint.sh      # Injects runtime API_URL into /usr/share/nginx/html/env.js
@@ -33,7 +36,10 @@ ticketflow/
 ├── services/
 │   ├── api-gateway/              # Spring Cloud Gateway (:8080) - Routing, CORS, JWT verification
 │   ├── auth-service/             # OIDC/JWKS Auth Service (:8081) - RS256 JWT, Refresh Token rotation
-│   └── event-service/            # Event & Venue Service (:8082) - PostgreSQL + Flyway + RBAC
+│   ├── event-service/            # Event & Venue Service (:8082) - PostgreSQL + Flyway + RBAC
+│   ├── booking-service/          # Booking & Seat Hold Service (:8083) - Redis 10m TTL Lock + RabbitMQ Saga
+│   ├── payment-service/          # Payment Service (:8084) - Idempotent Charges (payment_db) + Saga Consumer
+│   └── notification-service/     # Notification Service (:8085) - Consumes Saga Events & Dispatches QR Passes
 └── docker-compose.yml            # Full stack orchestration (Postgres, Redis, RabbitMQ, Services, Nginx UI)
 ```
 
@@ -57,7 +63,31 @@ docker compose ps
 | **API Gateway** | [http://localhost:8080](http://localhost:8080) | Unified REST entry point (`/api/auth/**`, `/api/events/**`, `/api/venues/**`) |
 | **Auth Service JWKS** | [http://localhost:8081/.well-known/jwks.json](http://localhost:8081/.well-known/jwks.json) | Public RSA key set for JWT verification |
 | **Event Service** | [http://localhost:8082/actuator/health](http://localhost:8082/actuator/health) | Event & Venue microservice health |
+| **Booking Service** | [http://localhost:8083/actuator/health](http://localhost:8083/actuator/health) | Redis 10m seat hold & booking microservice health |
+| **Payment Service** | [http://localhost:8084/actuator/health](http://localhost:8084/actuator/health) | Idempotent payment microservice health |
+| **Notification Service** | [http://localhost:8085/actuator/health](http://localhost:8085/actuator/health) | QR pass notification microservice health |
 | **RabbitMQ Management** | [http://localhost:15672](http://localhost:15672) | Broker UI (`ticketflow` / `ticketflow_secret`) |
+
+---
+
+## ☸️ Kubernetes Deployment & HPA (`k8s/`)
+
+```bash
+# Deploy Namespace, ConfigMap, Secrets, StatefulSets/Deployments, HPA, and Ingress
+kubectl apply -f k8s/
+
+# Watch Horizontal Pod Autoscalers (booking-service 2->10 pods, event-service 2->6 pods)
+kubectl get hpa -n ticketflow -w
+```
+
+---
+
+## ⚡ Flash-Sale Concurrency Load Testing (`k6`)
+
+```bash
+# Run the flash-sale catalog spike + 15-VU concurrent seat hold race on seat A1
+k6 run -e BASE_URL=http://localhost:8080 load-tests/flash-sale.js
+```
 
 ---
 

@@ -84,6 +84,86 @@ services:
       retries: 10
       start_period: 40s
 
+  booking-service:
+    build: ./services/booking-service
+    image: ticketflow/booking-service:local
+    container_name: ticketflow-booking
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/booking_db
+      DB_USER: ${POSTGRES_USER:-ticketflow}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-ticketflow_secret}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-ticketflow}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-ticketflow_secret}
+      JWKS_URI: http://auth-service:8081/.well-known/jwks.json
+    ports:
+      - "8083:8083"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8083/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+  payment-service:
+    build: ./services/payment-service
+    image: ticketflow/payment-service:local
+    container_name: ticketflow-payment
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/payment_db
+      DB_USER: ${POSTGRES_USER:-ticketflow}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-ticketflow_secret}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-ticketflow}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-ticketflow_secret}
+      JWKS_URI: http://auth-service:8081/.well-known/jwks.json
+    ports:
+      - "8084:8084"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8084/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+  notification-service:
+    build: ./services/notification-service
+    image: ticketflow/notification-service:local
+    container_name: ticketflow-notification
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-ticketflow}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-ticketflow_secret}
+      JWKS_URI: http://auth-service:8081/.well-known/jwks.json
+    ports:
+      - "8085:8085"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8085/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
   api-gateway:
     build: ./services/api-gateway
     image: ticketflow/api-gateway:local
@@ -92,12 +172,21 @@ services:
       JWKS_URI: http://auth-service:8081/.well-known/jwks.json
       AUTH_SERVICE_URL: http://auth-service:8081
       EVENT_SERVICE_URL: http://event-service:8082
+      BOOKING_SERVICE_URL: http://booking-service:8083
+      PAYMENT_SERVICE_URL: http://payment-service:8084
+      NOTIFICATION_SERVICE_URL: http://notification-service:8085
     ports:
       - "8080:8080"
     depends_on:
       auth-service:
         condition: service_healthy
       event-service:
+        condition: service_healthy
+      booking-service:
+        condition: service_healthy
+      payment-service:
+        condition: service_healthy
+      notification-service:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
@@ -120,7 +209,7 @@ services:
       api-gateway:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
       interval: 10s
       timeout: 5s
       retries: 5

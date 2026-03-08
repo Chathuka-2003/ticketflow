@@ -15,7 +15,7 @@ RUN if [ ! -f dist/ticketflow-ui/browser/index.html ]; then \
 FROM nginx:1.27-alpine AS runtime
 
 # Configure Nginx to run as non-root user on port 8080
-RUN sed -i 's,/var/run/nginx.pid,/tmp/nginx.pid,' /etc/nginx/nginx.conf \
+RUN sed -i 's,/var/run/nginx.pid,/tmp/nginx.pid,; s,/run/nginx.pid,/tmp/nginx.pid,' /etc/nginx/nginx.conf \
     && sed -i '/user  nginx;/d' /etc/nginx/nginx.conf \
     && rm -f /etc/nginx/conf.d/default.conf
 

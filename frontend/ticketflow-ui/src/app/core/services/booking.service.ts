@@ -1,8 +1,10 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { ConfigService } from '../config/config.service';
 import { EventDetail, TicketTypeResponse } from '../models/event.models';
 import {
   BookingRecord,
+  BookingStatus,
   SagaEventStep,
   SeatHoldSession,
   SeatNode,
@@ -16,8 +18,56 @@ const LOCKED_SEATS_KEY = 'ticketflow_sold_seats_v1';
 
 const TIER_COLORS = ['#ec4899', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b'];
 
+interface EventSeatStateResponse {
+  eventId: string;
+  heldSeats: string[];
+  soldSeats: string[];
+}
+
+interface BackendSeatHoldResponse {
+  holdId: string;
+  redisKey: string;
+  eventId: string;
+  eventTitle: string;
+  eventStartsAt: string;
+  venueName: string;
+  city: string;
+  category: string;
+  seats: { label: string; tierName: string; price: number }[];
+  totalAmount: number;
+  serviceFee: number;
+  grandTotal: number;
+  createdAt: number;
+  expiresAt: number;
+  ttlSeconds: number;
+  idempotencyKey: string;
+}
+
+interface BackendBookingResponse {
+  id: string;
+  bookingReference: string;
+  holdId: string;
+  userId: string;
+  userEmail: string;
+  eventId: string;
+  eventTitle: string;
+  eventCategory: string;
+  eventStartsAt: string;
+  venueName: string;
+  city: string;
+  seats: { label: string; tierName: string; price: number }[];
+  totalAmount: number;
+  serviceFee: number;
+  grandTotal: number;
+  status: BookingStatus;
+  idempotencyKey: string;
+  paymentMethod: string;
+  createdAt: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class BookingService {
+  private readonly http = inject(HttpClient);
   private readonly config = inject(ConfigService);
   private readonly auth = inject(AuthService);
   private readonly toast = inject(ToastService);
@@ -47,10 +97,14 @@ export class BookingService {
 
   constructor() {
     this.startHoldCountdownLoop();
+    if (this.auth.isAuthenticated()) {
+      this.syncMyBookingsFromBackend();
+    }
   }
 
   /**
-   * Builds a deterministic interactive seat map from an EventDetail's ticketTypes.
+   * Builds a deterministic interactive seat map from an EventDetail's ticketTypes
+   * and syncs live Redis held seats & PostgreSQL sold seats from booking-service.
    */
   generateSeatMap(event: EventDetail): SeatNode[] {
     const seats: SeatNode[] = [];
@@ -111,11 +165,25 @@ export class BookingService {
       }
     });
 
+    // Sync live seat state from booking-service (Redis holds + PostgreSQL sold seats)
+    this.http
+      .get<EventSeatStateResponse>(`${this.config.apiUrl}/bookings/events/${event.id}/seats`)
+      .subscribe({
+        next: (state) => {
+          if (state.soldSeats?.length) {
+            this.markSeatsSold(event.id, state.soldSeats);
+          }
+        },
+        error: () => {
+          // Offline / fallback mode uses local storage state
+        },
+      });
+
     return seats;
   }
 
   /**
-   * Acquires a 10-minute Redis-style seat hold lock (TTL = 600s).
+   * Acquires a 10-minute Redis seat hold lock (TTL = 600s) via booking-service.
    */
   createSeatHold(event: EventDetail, selectedSeats: SeatNode[]): SeatHoldSession {
     const now = Date.now();
@@ -150,10 +218,56 @@ export class BookingService {
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem(HOLD_STORAGE_KEY, JSON.stringify(session));
     }
+
+    // Acquire atomic Redis TTL lock in booking-service
+    this.http
+      .post<BackendSeatHoldResponse>(`${this.config.apiUrl}/bookings/hold`, {
+        eventId: event.id,
+        eventTitle: event.title,
+        eventStartsAt: event.startsAt,
+        venueName: event.venue?.name || 'Main Arena',
+        city: event.venue?.city || 'Colombo',
+        category: event.category,
+        seats: selectedSeats.map((s) => ({
+          label: s.label,
+          tierName: s.tierName,
+          price: s.price,
+        })),
+      })
+      .subscribe({
+        next: (res) => {
+          const synced: SeatHoldSession = {
+            ...session,
+            holdId: res.holdId,
+            redisKey: res.redisKey,
+            idempotencyKey: res.idempotencyKey,
+            expiresAt: res.expiresAt,
+          };
+          this.activeHold.set(synced);
+          if (typeof localStorage !== 'undefined') {
+            localStorage.setItem(HOLD_STORAGE_KEY, JSON.stringify(synced));
+          }
+        },
+        error: () => {
+          // Keep optimistic local hold if backend is unreachable
+        },
+      });
+
     return session;
   }
 
   releaseHold(notify = true): void {
+    const current = this.activeHold();
+    if (current && current.seats.length > 0) {
+      let params = new HttpParams();
+      current.seats.forEach((s) => {
+        params = params.append('seats', s.label);
+      });
+      this.http
+        .delete(`${this.config.apiUrl}/bookings/hold/${current.eventId}`, { params })
+        .subscribe({ error: () => {} });
+    }
+
     this.activeHold.set(null);
     this.remainingHoldSeconds.set(0);
     if (typeof localStorage !== 'undefined') {
@@ -200,6 +314,46 @@ export class BookingService {
       sagaSteps,
     };
 
+    // Execute real backend checkout in booking-service (PostgreSQL + Redis + RabbitMQ Saga)
+    this.http
+      .post<BackendBookingResponse>(`${this.config.apiUrl}/bookings/checkout`, {
+        holdId: hold.holdId,
+        eventId: hold.eventId,
+        eventTitle: hold.eventTitle,
+        eventCategory: hold.category,
+        eventStartsAt: hold.eventStartsAt,
+        venueName: hold.venueName,
+        city: hold.city,
+        seats: hold.seats.map((s) => ({
+          label: s.label,
+          tierName: s.tierName,
+          price: s.price,
+        })),
+        idempotencyKey: hold.idempotencyKey,
+        paymentMethod,
+        simulatePaymentFailure: !succeeded,
+      })
+      .subscribe({
+        next: (saved) => {
+          if (succeeded) {
+            this.bookings.update((list) =>
+              list.map((b) =>
+                b.idempotencyKey === saved.idempotencyKey
+                  ? {
+                      ...b,
+                      id: saved.id,
+                      bookingReference: saved.bookingReference,
+                      createdAt: saved.createdAt,
+                    }
+                  : b
+              )
+            );
+            this.persistBookings();
+          }
+        },
+        error: () => {},
+      });
+
     if (succeeded) {
       this.markSeatsSold(
         hold.eventId,
@@ -207,7 +361,11 @@ export class BookingService {
       );
       this.bookings.update((prev) => [record, ...prev]);
       this.persistBookings();
-      this.releaseHold(false);
+      this.activeHold.set(null);
+      this.remainingHoldSeconds.set(0);
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(HOLD_STORAGE_KEY);
+      }
     } else {
       // Saga compensation: release seat hold
       this.releaseHold(false);
@@ -219,6 +377,10 @@ export class BookingService {
   cancelBooking(bookingId: string): void {
     const target = this.bookings().find((b) => b.id === bookingId);
     if (!target) return;
+
+    this.http
+      .post<BackendBookingResponse>(`${this.config.apiUrl}/bookings/${bookingId}/cancel`, {})
+      .subscribe({ error: () => {} });
 
     this.unmarkSeatsSold(
       target.eventId,
@@ -235,6 +397,46 @@ export class BookingService {
       'Booking Cancelled',
       `Booking ${target.bookingReference} cancelled & seats released back to inventory.`
     );
+  }
+
+  syncMyBookingsFromBackend(): void {
+    this.http
+      .get<BackendBookingResponse[]>(`${this.config.apiUrl}/bookings/mine`)
+      .subscribe({
+        next: (remoteList) => {
+          if (!remoteList || remoteList.length === 0) return;
+          const existingByIdemp = new Map(
+            this.bookings().map((b) => [b.idempotencyKey, b])
+          );
+          const merged: BookingRecord[] = remoteList.map((r) => {
+            const local = existingByIdemp.get(r.idempotencyKey);
+            return {
+              id: r.id,
+              bookingReference: r.bookingReference,
+              userId: r.userId,
+              userEmail: r.userEmail,
+              eventId: r.eventId,
+              eventTitle: r.eventTitle,
+              eventCategory: r.eventCategory,
+              eventStartsAt: r.eventStartsAt,
+              venueName: r.venueName,
+              city: r.city,
+              seats: r.seats,
+              totalAmount: Number(r.totalAmount),
+              serviceFee: Number(r.serviceFee),
+              grandTotal: Number(r.grandTotal),
+              status: r.status,
+              idempotencyKey: r.idempotencyKey,
+              paymentMethod: r.paymentMethod,
+              createdAt: r.createdAt,
+              sagaSteps: local?.sagaSteps || [],
+            };
+          });
+          this.bookings.set(merged);
+          this.persistBookings();
+        },
+        error: () => {},
+      });
   }
 
   private startHoldCountdownLoop(): void {

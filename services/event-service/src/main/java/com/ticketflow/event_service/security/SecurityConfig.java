@@ -34,7 +34,7 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
+                        .requestMatchers("/actuator/health/**", "/actuator/info", "/actuator/prometheus").permitAll()
                         // "mine" must come before the public "/api/events/*" rule
                         .requestMatchers(HttpMethod.GET, "/api/events/mine").hasAnyRole("ORGANIZER", "ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/events", "/api/events/*", "/api/venues").permitAll()

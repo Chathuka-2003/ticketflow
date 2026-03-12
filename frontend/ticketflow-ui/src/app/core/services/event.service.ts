@@ -139,7 +139,7 @@ export class EventService {
         };
       case 'SPORTS':
         return {
-          bannerUrl: 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=1200&q=80',
+          bannerUrl: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1200&q=80',
           accentGradient: 'linear-gradient(135deg, #10b981 0%, #06b6d4 100%)',
           badgeIcon: '🏆',
           minPriceHint: 55,

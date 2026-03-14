@@ -29,4 +29,29 @@ public class RouteConfig {
                 .before(uri(eventUrl))
                 .build();
     }
+
+    @Bean
+    public RouterFunction<ServerResponse> bookingRoute(@Value("${services.booking-url}") String bookingUrl) {
+        return route("booking-service")
+                .route(path("/api/bookings/**"), http())
+                .before(uri(bookingUrl))
+                .build();
+    }
+
+    @Bean
+    public RouterFunction<ServerResponse> paymentRoute(@Value("${services.payment-url}") String paymentUrl) {
+        return route("payment-service")
+                .route(path("/api/payments/**"), http())
+                .before(uri(paymentUrl))
+                .build();
+    }
+
+    @Bean
+    public RouterFunction<ServerResponse> notificationRoute(
+            @Value("${services.notification-url}") String notificationUrl) {
+        return route("notification-service")
+                .route(path("/api/notifications/**"), http())
+                .before(uri(notificationUrl))
+                .build();
+    }
 }

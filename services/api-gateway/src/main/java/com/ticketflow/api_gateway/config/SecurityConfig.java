@@ -58,7 +58,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/login",
                                 "/api/auth/refresh", "/api/auth/logout").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/events/mine").authenticated()
-                        .requestMatchers(HttpMethod.GET, "/api/events", "/api/events/*", "/api/venues").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/events", "/api/events/*", "/api/venues",
+                                "/api/bookings/events/*/seats").permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> { }));
         return http.build();

@@ -13,6 +13,9 @@ spring:
 services:
   auth-url: ${AUTH_SERVICE_URL:http://localhost:8081}
   event-url: ${EVENT_SERVICE_URL:http://localhost:8082}
+  booking-url: ${BOOKING_SERVICE_URL:http://localhost:8083}
+  payment-url: ${PAYMENT_SERVICE_URL:http://localhost:8084}
+  notification-url: ${NOTIFICATION_SERVICE_URL:http://localhost:8085}
 
 management:
   endpoints:

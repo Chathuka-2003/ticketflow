@@ -3,15 +3,15 @@ services:
     image: postgres:16-alpine
     container_name: ticketflow-postgres
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_USER: ${POSTGRES_USER:-ticketflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ticketflow_secret}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ticketflow}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -31,8 +31,8 @@ services:
     image: rabbitmq:3-management-alpine
     container_name: ticketflow-rabbitmq
     environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-ticketflow}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-ticketflow_secret}
     ports:
       - "5672:5672"
       - "15672:15672"
@@ -48,9 +48,11 @@ services:
     container_name: ticketflow-auth
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/auth_db
-      DB_USER: ${POSTGRES_USER}
-      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_USER: ${POSTGRES_USER:-ticketflow}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-ticketflow_secret}
       COOKIE_SECURE: "false"
+    ports:
+      - "8081:8081"
     depends_on:
       postgres:
         condition: service_healthy
@@ -67,9 +69,11 @@ services:
     container_name: ticketflow-event
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/event_db
-      DB_USER: ${POSTGRES_USER}
-      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_USER: ${POSTGRES_USER:-ticketflow}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-ticketflow_secret}
       JWKS_URI: http://auth-service:8081/.well-known/jwks.json
+    ports:
+      - "8082:8082"
     depends_on:
       postgres:
         condition: service_healthy
@@ -101,6 +105,26 @@ services:
       timeout: 5s
       retries: 10
       start_period: 40s
+
+  frontend:
+    build: ./frontend/ticketflow-ui
+    image: ticketflow/frontend:local
+    container_name: ticketflow-frontend
+    environment:
+      API_URL: ${API_URL:-/api}
+      KEYCLOAK_ISSUER: ticketflow-auth
+    ports:
+      - "4200:8080"
+      - "80:8080"
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
 volumes:
   postgres_data:

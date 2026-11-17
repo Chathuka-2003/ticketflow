@@ -1,3 +1,24 @@
+server:
+  port: 8081
+
 spring:
   application:
     name: auth-service
+  datasource:
+    url: jdbc:postgresql://localhost:5432/auth_db
+    username: ${DB_USER:ticketflow}
+    password: ${DB_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+
+app:
+  security:
+    cookie-secure: ${COOKIE_SECURE:false}

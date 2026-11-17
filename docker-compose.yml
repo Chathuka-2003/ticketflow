@@ -42,5 +42,65 @@ services:
       timeout: 10s
       retries: 5
 
+  auth-service:
+    build: ./services/auth-service
+    image: ticketflow/auth-service:local
+    container_name: ticketflow-auth
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/auth_db
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      COOKIE_SECURE: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8081/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+  event-service:
+    build: ./services/event-service
+    image: ticketflow/event-service:local
+    container_name: ticketflow-event
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/event_db
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      JWKS_URI: http://auth-service:8081/.well-known/jwks.json
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8082/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+  api-gateway:
+    build: ./services/api-gateway
+    image: ticketflow/api-gateway:local
+    container_name: ticketflow-gateway
+    environment:
+      JWKS_URI: http://auth-service:8081/.well-known/jwks.json
+      AUTH_SERVICE_URL: http://auth-service:8081
+      EVENT_SERVICE_URL: http://event-service:8082
+    ports:
+      - "8080:8080"
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      event-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
 volumes:
   postgres_data:

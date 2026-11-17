@@ -1,3 +1,27 @@
+server:
+  port: 8082
+
 spring:
   application:
     name: event-service
+  datasource:
+    url: jdbc:postgresql://localhost:5432/event_db
+    username: ${DB_USER:ticketflow}
+    password: ${DB_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${JWKS_URI:http://localhost:8081/.well-known/jwks.json}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

@@ -1,3 +1,21 @@
+server:
+  port: 8080
+
 spring:
   application:
     name: api-gateway
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${JWKS_URI:http://localhost:8081/.well-known/jwks.json}
+
+services:
+  auth-url: ${AUTH_SERVICE_URL:http://localhost:8081}
+  event-url: ${EVENT_SERVICE_URL:http://localhost:8082}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

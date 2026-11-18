@@ -1,5 +1,5 @@
 # ---------- build stage ----------
-FROM eclipse-temurin:21-jdk AS build
+FROM eclipse-temurin:24-jdk AS build
 WORKDIR /workspace
 
 ENV MAVEN_OPTS="-Dhttps.protocols=TLSv1.2 -Dmaven.wagon.http.retryHandler.count=5 -Daether.connector.http.retryHandler.count=5 -Dmaven.wagon.http.pool=false"
@@ -11,7 +11,7 @@ RUN sed -i 's/\r$//' mvnw && chmod +x mvnw \
        fi
 
 # ---------- runtime stage ----------
-FROM eclipse-temurin:21-jre
+FROM eclipse-temurin:24-jre
 WORKDIR /app
 
 RUN groupadd --system app && useradd --system --gid app --no-create-home app

@@ -14,12 +14,19 @@ resource "aws_security_group" "rds" {
     protocol    = "tcp"
     cidr_blocks = [var.vpc_cidr]
   }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
 }
 
 resource "aws_db_instance" "postgres" {
   identifier             = "ticketflow-${var.environment}-postgres"
   engine                 = "postgres"
-  engine_version         = "16.4"
+  engine_version         = "16"
   instance_class         = var.db_instance_class
   allocated_storage      = 20
   max_allocated_storage  = 100
@@ -29,6 +36,6 @@ resource "aws_db_instance" "postgres" {
   password               = var.db_master_password
   db_subnet_group_name   = aws_db_subnet_group.postgres.name
   vpc_security_group_ids = [aws_security_group.rds.id]
-  multi_az               = true
+  multi_az               = false
   skip_final_snapshot    = true
 }

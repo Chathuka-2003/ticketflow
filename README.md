@@ -58,6 +58,8 @@
 
 ## 🏛️ System Architecture & Saga Flow
 
+![TicketFlow Animated Architecture](docs/ticketflow-architecture.gif)
+
 ```mermaid
 sequenceDiagram
     autonumber

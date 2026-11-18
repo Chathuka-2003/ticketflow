@@ -14,8 +14,9 @@ RUN if [ ! -f dist/ticketflow-ui/browser/index.html ]; then \
 # ---------- Stage 2: Non-Root Nginx Runtime ----------
 FROM nginx:1.27-alpine AS runtime
 
-# Configure Nginx to run as non-root user on port 8080
-RUN sed -i 's,/var/run/nginx.pid,/tmp/nginx.pid,; s,/run/nginx.pid,/tmp/nginx.pid,' /etc/nginx/nginx.conf \
+# Upgrade Alpine OS packages (e.g. openssl/libcrypto3/libssl3, brotli-libs) and configure non-root Nginx
+RUN apk update && apk upgrade --no-cache \
+    && sed -i 's,/var/run/nginx.pid,/tmp/nginx.pid,; s,/run/nginx.pid,/tmp/nginx.pid,' /etc/nginx/nginx.conf \
     && sed -i '/user  nginx;/d' /etc/nginx/nginx.conf \
     && rm -f /etc/nginx/conf.d/default.conf
 

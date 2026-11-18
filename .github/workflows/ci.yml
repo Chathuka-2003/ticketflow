@@ -89,7 +89,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=${{ matrix.service }}
 
       - name: Scan image with Trivy
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ticketflow/${{ matrix.service }}:ci
           severity: CRITICAL
@@ -115,7 +115,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=frontend
 
       - name: Scan frontend image with Trivy
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ticketflow/frontend:ci
           severity: CRITICAL

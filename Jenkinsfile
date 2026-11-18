@@ -32,6 +32,9 @@ pipeline {
 
     environment {
         IMAGE_TAG = "${env.BUILD_NUMBER}"
+        DB_HOST = 'ticketflow-postgres'
+        DB_USER = 'ticketflow'
+        DB_PASSWORD = 'ticketflow_secret'
     }
 
     stages {
@@ -44,6 +47,9 @@ pipeline {
         stage('Test Microservices') {
             parallel {
                 stage('auth-service') {
+                    environment {
+                        SPRING_DATASOURCE_URL = "jdbc:postgresql://${DB_HOST}:5432/auth_db"
+                    }
                     steps {
                         dir('services/auth-service') {
                             sh 'chmod +x mvnw && ./mvnw -B test'
@@ -56,6 +62,9 @@ pipeline {
                     }
                 }
                 stage('event-service') {
+                    environment {
+                        SPRING_DATASOURCE_URL = "jdbc:postgresql://${DB_HOST}:5432/event_db"
+                    }
                     steps {
                         dir('services/event-service') {
                             sh 'chmod +x mvnw && ./mvnw -B test'
@@ -68,6 +77,9 @@ pipeline {
                     }
                 }
                 stage('booking-service') {
+                    environment {
+                        SPRING_DATASOURCE_URL = "jdbc:postgresql://${DB_HOST}:5432/booking_db"
+                    }
                     steps {
                         dir('services/booking-service') {
                             sh 'chmod +x mvnw && ./mvnw -B test'
@@ -80,6 +92,9 @@ pipeline {
                     }
                 }
                 stage('payment-service') {
+                    environment {
+                        SPRING_DATASOURCE_URL = "jdbc:postgresql://${DB_HOST}:5432/payment_db"
+                    }
                     steps {
                         dir('services/payment-service') {
                             sh 'chmod +x mvnw && ./mvnw -B test'
